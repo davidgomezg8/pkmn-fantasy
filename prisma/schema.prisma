@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// =======================================
+//               ENUMS
+// =======================================
+enum LeagueStatus {
+  OPEN
+  TEAMS_GENERATED
+  IN_PROGRESS
+  COMPLETED
+}
+
+// =======================================
+//               MODELS
+// =======================================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  teams     Team[]
+  createdLeagues League[] @relation("CreatedLeagues")
+}
+
+model League {
+  id        Int         @id @default(autoincrement())
+  name      String
+  creator   User        @relation("CreatedLeagues", fields: [creatorId], references: [id])
+  creatorId Int
+  status    LeagueStatus @default(OPEN)
+  maxPlayers Int @default(8) // Maximum number of players allowed in the league
+  joinCode  String? @unique // Unique code for joining the league
+  teams     Team[]
+  pokemons  Pokemon[] // New field for inverse relation with Pokemon
+}
+
+model Team {
+  id        Int       @id @default(autoincrement())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    Int
+  league    League    @relation(fields: [leagueId], references: [id])
+  leagueId  Int
+  pokemons  Pokemon[]
+  proposingTrades  Trade[] @relation("ProposingTrades")
+  targetedTrades   Trade[] @relation("TargetedTrades")
+}
+
+model Pokemon {
+  id         Int    @id @default(autoincrement())
+  pokemonId  Int    @unique // The ID from the PokeAPI
+  name       String
+  image        String
+  hp           Int
+  attack       Int
+  defense      Int
+  specialAttack Int @map("special_attack")
+  specialDefense Int @map("special_defense")
+  speed        Int
+  order        Int     @default(0)
+  nickname     String? // Optional nickname for the Pokémon
+  leagueId     Int?    // New field to associate Pokémon with a league
+  league       League? @relation(fields: [leagueId], references: [id]) // New relation
+  team       Team?   @relation(fields: [teamId], references: [id])
+  teamId     Int?
+  offeredInTrades    Trade[] @relation("OfferedPokemon")
+  requestedInTrades  Trade[] @relation("RequestedPokemon")
+}
+
+model Trade {
+  id                 Int      @id @default(autoincrement())
+  status             String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, CANCELED
+  createdAt          DateTime @default(now())
+
+  proposingTeamId    Int
+  proposingTeam      Team     @relation("ProposingTrades", fields: [proposingTeamId], references: [id])
+
+  targetTeamId       Int
+  targetTeam         Team     @relation("TargetedTrades", fields: [targetTeamId], references: [id])
+
+  offeredPokemonId   Int
+  offeredPokemon     Pokemon  @relation("OfferedPokemon", fields: [offeredPokemonId], references: [id])
+
+  requestedPokemonId Int
+  requestedPokemon   Pokemon  @relation("RequestedPokemon", fields: [requestedPokemonId], references: [id])
+}

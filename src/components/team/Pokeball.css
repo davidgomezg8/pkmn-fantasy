@@ -1,0 +1,63 @@
+.pokeball-container {
+  cursor: pointer;
+  perspective: 1000px;
+}
+
+.pokeball {
+  width: 180px; /* Make it more rectangular */
+  height: 250px;
+  position: relative;
+}
+
+.pokeball-container.revealed .pokeball {
+  /* No transform here, controlled by opacity */
+}
+
+.pokeball-front-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: opacity 0.8s;
+}
+
+.pokeball-container.revealed .pokeball-front-image {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.pokemon-image {
+  margin-bottom: 10px;
+  width: 100px; /* Adjust image size */
+  height: 100px;
+  object-fit: contain;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.8s;
+}
+
+.pokeball-container.revealed .pokemon-image {
+  opacity: 1;
+  visibility: visible;
+}
+
+.pokemon-name {
+  font-family: 'Press Start 2P', sans-serif;
+  font-size: 0.8rem;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.pokemon-stats {
+  width: 100%;
+  padding: 5px;
+  font-size: 0.7rem;
+  color: #555;
+  text-align: left;
+}
+
+.pokemon-stats p {
+  margin: 2px 0;
+}
