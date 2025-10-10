@@ -244,6 +244,11 @@ export default function LeagueDetailsPage() {
       {isMember && league.joinCode && (
         <p><strong>Código de Unión:</strong> {league.joinCode}</p>
       )}
+
+      <Link href={`/leagues/${leagueId}/market`} className="btn btn-info mt-3 mb-4">
+        Ir al Mercado
+      </Link>
+
       <h2 className="mt-4">Miembros de la Liga:</h2>
       {league.teams.length > 0 ? (
         <div className="list-group">

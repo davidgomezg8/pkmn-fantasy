@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 // Basic Pokemon and Team interfaces for type safety
 interface Pokemon {
   id: number;
+  pokedexId: number;
   name: string;
 }
 
@@ -179,7 +180,7 @@ export default function MarketPage() {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Fichar a {selectedFreeAgent.name}</h5>
-                <button type-button" className="btn-close" onClick={handleCloseSignModal}></button>
+                <button type="button" className="btn-close" onClick={handleCloseSignModal}></button>
               </div>
               <div className="modal-body">
                 <p>Para fichar a {selectedFreeAgent.name}, debes liberar a uno de tus Pokémon. Selecciona a quién quieres dejar libre:</p>

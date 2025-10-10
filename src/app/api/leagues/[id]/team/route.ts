@@ -14,7 +14,8 @@ export async function GET(
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
-  const leagueId = parseInt(params.id);
+  const { id } = params;
+  const leagueId = parseInt(id);
   // @ts-ignore
   const userId = parseInt(session.user.id);
   
