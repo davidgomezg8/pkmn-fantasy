@@ -15,6 +15,17 @@ async function getPokemonDetails(url: string) {
   console.log('PokeAPI raw data for', data.name, ':', data);
   console.log('Processed stats for', data.name, ':', stats);
 
+  const movesData = await Promise.all(
+    data.moves.slice(0, 4).map(async (moveEntry: any) => {
+      const moveResponse = await fetch(moveEntry.move.url);
+      const moveDetails = await moveResponse.json();
+      return {
+        name: moveDetails.name,
+        power: moveDetails.power || 0, // Algunos movimientos no tienen poder
+      };
+    })
+  );
+
   const pokemonData = {
     pokemonId: data.id,
     name: data.name,
@@ -25,9 +36,8 @@ async function getPokemonDetails(url: string) {
     specialAttack: stats['special-attack'],
     specialDefense: stats['special-defense'],
     speed: stats.speed,
+    moves: movesData,
   };
-
-  console.log('Pokemon data for upsert for', data.name, ':', pokemonData);
 
   // Upsert the Pokémon into our database
   const createdOrUpdatedPokemon = await prisma.pokemon.upsert({

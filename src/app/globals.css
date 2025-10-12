@@ -26,6 +26,76 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.battle-container {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+.battle-arena {
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  position: relative;
+}
+
+.opponent-side {
+  order: 2; /* Opponent on the right */
+  text-align: right;
+}
+
+.player-side {
+  order: 1; /* Player on the left */
+  text-align: left;
+}
+
+.pokemon-display {
+  position: relative;
+  padding: 20px;
+}
+
+.pokemon-display img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  margin-bottom: 10px;
+}
+
+.pokemon-display h2 {
+  font-size: 1.8rem;
+  color: #3b4cca;
+  text-transform: capitalize;
+}
+
+.battle-controls {
+  background-color: #f0f0f0;
+  border-top: 5px solid #3b4cca;
+  padding: 1.5rem;
+  border-radius: 0 0 15px 15px;
+}
+
+.battle-log {
+  margin-top: 2rem;
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: #e0e0e0;
+  padding: 1rem;
+  border-radius: 10px;
+}
+
+.battle-log ul {
+  list-style: none;
+  padding: 0;
+}
+
+.battle-log li {
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+  color: #333;
+}
+
 .game-screen {
   background-color: rgba(255, 255, 255, 0.85);
   border: 10px solid #3b4cca; /* Pokémon Blue color */

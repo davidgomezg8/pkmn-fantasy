@@ -219,6 +219,38 @@ export default function LeagueDetailsPage() {
     }
   };
 
+  const handleChallenge = async (opponentTeamId: number) => {
+    if (!session || !session.user) {
+      setMessage('Debes iniciar sesión para desafiar a otros jugadores.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/battle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          leagueId, 
+          opponentTeamId 
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al crear la batalla.');
+      }
+
+      const battleResult = await response.json();
+      const myTeam = league?.teams.find(team => team.userId === parseInt((session?.user as any).id, 10));
+      router.push(`/battle/live/${battleResult.id}?myTeamId=${myTeam?.id}`);
+
+    } catch (err: any) {
+      setMessage(err.message);
+    }
+  };
+
   if (loading) {
     return <div className="container text-center mt-5"><h1>Cargando detalles de la liga...</h1></div>;
   }
@@ -253,9 +285,14 @@ export default function LeagueDetailsPage() {
       {league.teams.length > 0 ? (
         <div className="list-group">
           {league.teams.map((team) => (
-            <Link key={team.id} href={`/leagues/${leagueId}/teams/${team.id}`} className="list-group-item list-group-item-action">
-              {team.user.email}
-            </Link>
+            <div key={team.id} className="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+              <Link href={`/leagues/${leagueId}/teams/${team.id}`}>
+                {team.user.email}
+              </Link>
+              {session && session.user && parseInt((session.user as any).id, 10) !== team.userId && (
+                <button onClick={() => handleChallenge(team.id)} className="btn btn-danger">Combatir</button>
+              )}
+            </div>
           ))}
         </div>
       ) : (

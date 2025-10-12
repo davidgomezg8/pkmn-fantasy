@@ -35,6 +35,7 @@ async function main() {
       },
     },
   });
+  console.log(`Kanto League ID: ${kantoLeague.id}`);
 
   const johtoLeague = await prisma.league.create({
     data: {
@@ -76,6 +77,17 @@ async function main() {
       return acc;
     }, {});
 
+    const movesData = await Promise.all(
+      data.moves.slice(0, 4).map(async (moveEntry: any) => {
+        const moveResponse = await fetch(moveEntry.move.url);
+        const moveDetails = await moveResponse.json();
+        return {
+          name: moveDetails.name,
+          power: moveDetails.power || 0,
+        };
+      })
+    );
+
     pokemonData.push({
       pokemonId: data.id,
       name: data.name,
@@ -86,9 +98,10 @@ async function main() {
       specialAttack: stats['special-attack'] || 0,
       specialDefense: stats['special-defense'] || 0,
       speed: stats.speed || 0,
-      leagueId: null, // Initially not assigned to any league
-      teamId: null,    // Initially not assigned to any team
-      order: 0,        // Default order
+      leagueId: null, // Assign to Kanto League
+      teamId: null,
+      order: 0,
+      moves: movesData, // Add moves data
     });
   }
 

@@ -42,6 +42,7 @@ model League {
   joinCode  String? @unique // Unique code for joining the league
   teams     Team[]
   pokemons  Pokemon[] // New field for inverse relation with Pokemon
+  battles   Battle[]
 }
 
 model Team {
@@ -53,6 +54,8 @@ model Team {
   pokemons  Pokemon[]
   proposingTrades  Trade[] @relation("ProposingTrades")
   targetedTrades   Trade[] @relation("TargetedTrades")
+  battlesAsTrainerA Battle[] @relation("BattlesAsTrainerA")
+  battlesAsTrainerB Battle[] @relation("BattlesAsTrainerB")
 }
 
 model Pokemon {
@@ -72,6 +75,7 @@ model Pokemon {
   league       League? @relation(fields: [leagueId], references: [id]) // New relation
   team       Team?   @relation(fields: [teamId], references: [id])
   teamId     Int?
+  moves      Json     @default("[]") // New field to store moves as JSON
   offeredInTrades    Trade[] @relation("OfferedPokemon")
   requestedInTrades  Trade[] @relation("RequestedPokemon")
 }
@@ -92,4 +96,23 @@ model Trade {
 
   requestedPokemonId Int
   requestedPokemon   Pokemon  @relation("RequestedPokemon", fields: [requestedPokemonId], references: [id])
+  moves              Json     @default("[]") // New field to store moves as JSON
+}
+
+model Battle {
+  id         Int      @id @default(autoincrement())
+  leagueId   Int
+  trainerAId Int
+  trainerBId Int
+  winnerId   Int?
+  powerA     Int
+  powerB     Int
+  createdAt  DateTime @default(now())
+  league     League   @relation(fields: [leagueId], references: [id])
+  trainerA   Team     @relation("BattlesAsTrainerA", fields: [trainerAId], references: [id])
+  trainerB   Team     @relation("BattlesAsTrainerB", fields: [trainerBId], references: [id])
+
+  @@index([leagueId])
+  @@index([trainerAId])
+  @@index([trainerBId])
 }

@@ -60,7 +60,6 @@ export async function POST(request: Request) {
     const masterPokemons = await prisma.pokemon.findMany({
       where: {
         leagueId: null, // Get pokemons not assigned to any league (our master list)
-        teamId: null,   // Ensure they are not on any team
       },
       // Select only the fields needed to create a new Pokemon record
       select: {
@@ -75,8 +74,11 @@ export async function POST(request: Request) {
         speed: true,
         nickname: true, // Include nickname if it exists
         order: true,
+        moves: true, // Include moves data
       },
     });
+
+    console.log('[Create League API] Master Pokemons fetched:', masterPokemons.length, masterPokemons.map(p => p.name));
 
     if (masterPokemons.length === 0) {
       // This is a critical error if the seed script hasn't run

@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const awaitedParams = await params;
   const leagueId = parseInt(awaitedParams.id);
+  console.log(`[GenerateTeams API] Received request for leagueId: ${leagueId}`);
 
           if (isNaN(leagueId)) {
             return NextResponse.json({ message: 'ID de liga inválido.' }, { status: 400 });
@@ -21,16 +22,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             });
       
             if (!league) {
+              console.log(`[GenerateTeams API] League ${leagueId} not found.`);
               return NextResponse.json({ message: 'Liga no encontrada.' }, { status: 404 });
             }
       
             if (league.status !== 'OPEN') {
+              console.log(`[GenerateTeams API] League ${leagueId} status is ${league.status}, not OPEN.`);
               return NextResponse.json({ message: 'Los equipos ya han sido generados para esta liga o la liga no está abierta.' }, { status: 400 });
             }
       
             const playersInLeague = league.teams.map(team => team.user);
+            console.log(`[GenerateTeams API] Players in league ${leagueId}: ${playersInLeague.length}`);
       
             if (playersInLeague.length === 0) {
+              console.log(`[GenerateTeams API] No players in league ${leagueId}.`);
               return NextResponse.json({ message: 'No hay jugadores en la liga para generar equipos.' }, { status: 400 });
             }
       
@@ -41,8 +46,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 teamId: null,
               },
             });
+            console.log(`[GenerateTeams API] Available Pokémon for league ${leagueId}: ${availablePokemon.length}`);
       
             if (availablePokemon.length < league.teams.length * 6) { // Assuming 6 Pokémon per team
+              console.log(`[GenerateTeams API] Not enough Pokémon for league ${leagueId}. Needed: ${league.teams.length * 6}, Available: ${availablePokemon.length}`);
               return NextResponse.json({ message: 'No hay suficientes Pokémon disponibles en el pool de esta liga para generar equipos.' }, { status: 400 });
             }    // 3. Shuffle available Pokémon for random assignment
     const shuffledPokemon = availablePokemon.sort(() => 0.5 - Math.random());
