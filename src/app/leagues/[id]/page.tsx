@@ -41,8 +41,6 @@ export default function LeagueDetailsPage() {
   const [leaguePokemons, setLeaguePokemons] = useState<Pokemon[]>([]);
   const [allAvailablePokemons, setAllAvailablePokemons] = useState<Pokemon[]>([]);
   const [showAddPokemonModal, setShowAddPokemonModal] = useState(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [incomingChallenge, setIncomingChallenge] = useState<{ from: string, battleId: number } | null>(null);
 
   const fetchLeagueDetails = async () => {
     try {
@@ -99,37 +97,7 @@ export default function LeagueDetailsPage() {
     setLoading(false);
   }, [leagueId, status]);
 
-  useEffect(() => {
-    const newSocket = io();
-    setSocket(newSocket);
 
-    newSocket.on('connect', () => {
-      console.log('Connected to socket server');
-      if (session?.user) {
-        newSocket.emit('registerUser', parseInt((session.user as any).id, 10));
-      }
-    });
-
-    newSocket.on('challenge', ({ from, battleId }) => {
-      console.log('Received challenge event:', { from, battleId });
-      setIncomingChallenge({ from, battleId });
-    });
-
-    newSocket.on('battleAccepted', ({ battleId, myTeamId }) => {
-      console.log('Received battleAccepted event:', { battleId, myTeamId });
-      setIncomingChallenge(null); // Clear any incoming challenge
-      router.push(`/battle/live/${battleId}?myTeamId=${myTeamId}`);
-    });
-
-    newSocket.on('battleRejected', ({ battleId }) => {
-      setIncomingChallenge(null); // Clear any incoming challenge
-      setMessage('Tu desafío ha sido rechazado.');
-    });
-
-    return () => {
-      newSocket.disconnect();
-    };
-  }, [session]);
 
   const handleAddPokemonToLeague = async (pokemonId: number) => {
     console.log('Attempting to add Pokémon with ID:', pokemonId, 'to league:', leagueId);
@@ -261,7 +229,7 @@ export default function LeagueDetailsPage() {
     }
 
     try {
-      const response = await fetch(`/api/battle`, {
+      const response = await fetch(`/api/battle/challenge`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -274,21 +242,7 @@ export default function LeagueDetailsPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al crear la batalla.');
-      }
-
-      const battleResult = await response.json();
-      
-      // Emit challenge event to the opponent
-      if (socket) {
-        const opponentTeam = league?.teams.find(team => team.id === opponentTeamId);
-        if (opponentTeam) {
-          socket.emit('challenge', {
-            toUserId: opponentTeam.userId,
-            from: session.user.email,
-            battleId: battleResult.id,
-          });
-        }
+        throw new Error(errorData.message || 'Error al enviar el desafío.');
       }
 
       setMessage('Desafío enviado. Esperando respuesta del oponente.');
@@ -298,37 +252,7 @@ export default function LeagueDetailsPage() {
     }
   };
 
-  const handleAcceptChallenge = async () => {
-    if (incomingChallenge) {
-      try {
-        const response = await fetch(`/api/battles/${incomingChallenge.battleId}/accept`, {
-          method: 'POST',
-        });
-        if (!response.ok) {
-          throw new Error('Failed to accept challenge');
-        }
-        const myTeam = league?.teams.find(team => team.userId === parseInt((session?.user as any).id, 10));
-        router.push(`/battle/live/${incomingChallenge.battleId}?myTeamId=${myTeam?.id}`);
-      } catch (error) {
-        console.error(error);
-        setMessage('Error al aceptar el desafío.');
-      }
-    }
-  };
 
-  const handleRejectChallenge = async () => {
-    if (incomingChallenge) {
-      try {
-        await fetch(`/api/battles/${incomingChallenge.battleId}/reject`, {
-          method: 'POST',
-        });
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIncomingChallenge(null);
-      }
-    }
-  };
 
   if (loading) {
     return <div className="container text-center mt-5"><h1>Cargando detalles de la liga...</h1></div>;
@@ -444,24 +368,7 @@ export default function LeagueDetailsPage() {
 
       {message && <div className="alert alert-info mt-3">{message}</div>}
 
-      {incomingChallenge && (
-        <div className="modal" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">¡Te han desafiado!</h5>
-              </div>
-              <div className="modal-body">
-                <p>{incomingChallenge.from} te ha desafiado a una batalla.</p>
-              </div>
-              <div className="modal-footer">
-                <button onClick={handleRejectChallenge} className="btn btn-secondary">Rechazar</button>
-                <button onClick={handleAcceptChallenge} className="btn btn-primary">Aceptar</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { Pokemon, Move, calculateDamage } from './battle';
 import { Prisma, BattleStatus } from '@prisma/client';
 
 declare global {
-  var battleManagerInstance: BattleManager;
+  var battleManager: BattleManager | undefined;
 }
 
 // Define a type that includes the 'moves' property
@@ -31,24 +31,115 @@ interface BattleState {
 }
 
 class BattleManager {
-  private static instance: BattleManager;
   private battles: Map<number, BattleState>;
-  private io: SocketIOServer | null = null; // Initialize as null
+  public io: SocketIOServer | null = null; // Initialize as null
+  public userSockets: Map<number, string> | null = null;
 
-  private constructor() {
+  constructor() {
     this.battles = new Map<number, BattleState>();
     console.log('BattleManager constructor called');
   }
 
-  public static getInstance(): BattleManager {
-    if (!BattleManager.instance) {
-      BattleManager.instance = new BattleManager();
-    }
-    return BattleManager.instance;
-  }
-
   public setIo(io: SocketIOServer): void {
     this.io = io;
+  }
+
+  public setUserSockets(userSockets: Map<number, string>): void {
+    this.userSockets = userSockets;
+  }
+
+  public challengePlayer(toUserId: number, from: string, battleId: number) {
+    if (!this.io || !this.userSockets) {
+      console.error('[BattleManager] IO or userSockets not set!');
+      return;
+    }
+
+    const toSocketId = this.userSockets.get(toUserId);
+    if (toSocketId) {
+      this.io.to(toSocketId).emit('challenge', { from, battleId });
+      console.log(`[BattleManager.challenge] Emitted challenge to user ${toUserId} on socket ${toSocketId}`);
+    } else {
+      console.log(`[BattleManager.challenge] User ${toUserId} not connected.`);
+    }
+  }
+
+  public async handlePlayerJoin(battleId: number, teamId: number, socketId: string) {
+    if (!this.io) {
+      console.error('[BattleManager] IO not set!');
+      return;
+    }
+
+    try {
+      const battleState = await this.getBattle(battleId);
+      
+      if (battleState.players[teamId]) {
+        battleState.players[teamId].socketId = socketId;
+        console.log(`[BattleManager.join] Player with teamId ${teamId} joined battle ${battleId} with socket ${socketId}`);
+      } else {
+        console.error(`[BattleManager.join] TeamId ${teamId} not found in battle ${battleId}`);
+        return;
+      }
+
+      // Send the full state to the player who just joined
+      this.io.to(socketId).emit('updateState', battleState);
+      console.log(`[BattleManager.join] Sent initial state to player with teamId ${teamId}`);
+
+      // Notify the other player that their opponent has connected
+      const opponent = Object.values(battleState.players).find(p => p.teamId !== teamId);
+      if (opponent && opponent.socketId) {
+        this.io.to(opponent.socketId).emit('updateState', battleState);
+        console.log(`[BattleManager.join] Sent update to opponent with teamId ${opponent.teamId}`);
+      }
+
+    } catch (error) {
+      console.error(`[BattleManager.join] Error handling player join for battle ${battleId}:`, error);
+      // Optionally, emit an error back to the client
+      this.io.to(socketId).emit('battleError', 'Failed to join battle.');
+    }
+  }
+
+  public async acceptBattle(battleId: number): Promise<void> {
+    if (!this.io || !this.userSockets) {
+      console.error('[BattleManager] IO or userSockets not set!');
+      return;
+    }
+
+    const battle = await prisma.battle.update({
+      where: { id: battleId },
+      data: { status: 'IN_PROGRESS' },
+      include: {
+        trainerA: { include: { user: true } },
+        trainerB: { include: { user: true } },
+      },
+    });
+
+    if (!battle) {
+      throw new Error('Battle not found');
+    }
+
+    const userAId = battle.trainerA.userId;
+    const userBId = battle.trainerB.userId;
+    const teamAId = battle.trainerAId;
+    const teamBId = battle.trainerBId;
+
+    const socketAId = this.userSockets.get(userAId);
+    const socketBId = this.userSockets.get(userBId);
+
+    console.log(`[BattleManager.accept] Notifying users ${userAId} and ${userBId}`);
+
+    if (socketAId) {
+      this.io.to(socketAId).emit('battleAccepted', { battleId, myTeamId: teamAId });
+      console.log(`[BattleManager.accept] Emitted to User A (${userAId}) on socket ${socketAId}`);
+    } else {
+      console.log(`[BattleManager.accept] User A (${userAId}) not connected.`);
+    }
+
+    if (socketBId) {
+      this.io.to(socketBId).emit('battleAccepted', { battleId, myTeamId: teamBId });
+      console.log(`[BattleManager.accept] Emitted to User B (${userBId}) on socket ${socketBId}`);
+    } else {
+      console.log(`[BattleManager.accept] User B (${userBId}) not connected.`);
+    }
   }
 
   public async getBattle(battleId: number): Promise<BattleState> {
@@ -178,43 +269,36 @@ class BattleManager {
     const battle = this.battles.get(battleId);
     if (!battle) return;
 
-    const player1 = battle.players[battle.turnOrder[0]];
-    const player2 = battle.players[battle.turnOrder[1]];
+    // Find the players based on whose turn it is.
+    const player1 = Object.values(battle.players).find(p => p.teamId === battle.turn);
+    const player2 = Object.values(battle.players).find(p => p.teamId !== battle.turn);
 
-    if (!player1.selectedMove || !player2.selectedMove) {
+    if (!player1 || !player2 || !player1.selectedMove || !player2.selectedMove) {
+      console.error('[BattleManager] executeTurn called with incomplete state.');
       return;
     }
 
-    const move1 = player1.activePokemon.moves.find(m => m.name === player1.selectedMove);
-    const move2 = player2.activePokemon.moves.find(m => m.name === player2.selectedMove);
-
-    if (!move1 || !move2) {
-      return;
-    }
-
+    // Determine attack order by speed
     const fasterPlayer = player1.activePokemon.speed >= player2.activePokemon.speed ? player1 : player2;
     const slowerPlayer = fasterPlayer === player1 ? player2 : player1;
 
-    const fasterMove = fasterPlayer.activePokemon.moves.find(m => m.name === fasterPlayer.selectedMove);
-    const slowerMove = slowerPlayer.activePokemon.moves.find(m => m.name === slowerPlayer.selectedMove);
+    const fasterMove = fasterPlayer.activePokemon.moves.find(m => m.name === fasterPlayer.selectedMove)!;
+    const slowerMove = slowerPlayer.activePokemon.moves.find(m => m.name === slowerPlayer.selectedMove)!;
 
-    if (!fasterMove || !slowerMove) {
-      return;
-    }
-
-    // Faster player attacks
+    // 1. Faster player attacks
     let damage = calculateDamage(fasterPlayer.activePokemon, slowerPlayer.activePokemon, fasterMove);
     slowerPlayer.activePokemon.currentHp -= damage;
-    battle.log.push(`${fasterPlayer.activePokemon.name} used ${fasterMove.name} and dealt ${damage} damage to ${slowerPlayer.activePokemon.name}`);
+    battle.log.push(`${fasterPlayer.activePokemon.name} used ${fasterMove.name} and dealt ${damage} damage to ${slowerPlayer.activePokemon.name}.`);
 
+    // Check if slower player fainted
     if (slowerPlayer.activePokemon.currentHp <= 0) {
       slowerPlayer.activePokemon.currentHp = 0;
       battle.log.push(`${slowerPlayer.activePokemon.name} has fainted!`);
     } else {
-      // Slower player attacks
+      // 2. Slower player attacks
       damage = calculateDamage(slowerPlayer.activePokemon, fasterPlayer.activePokemon, slowerMove);
       fasterPlayer.activePokemon.currentHp -= damage;
-      battle.log.push(`${slowerPlayer.activePokemon.name} used ${slowerMove.name} and dealt ${damage} damage to ${fasterPlayer.activePokemon.name}`);
+      battle.log.push(`${slowerPlayer.activePokemon.name} used ${slowerMove.name} and dealt ${damage} damage to ${fasterPlayer.activePokemon.name}.`);
 
       if (fasterPlayer.activePokemon.currentHp <= 0) {
         fasterPlayer.activePokemon.currentHp = 0;
@@ -222,69 +306,77 @@ class BattleManager {
       }
     }
 
-    player1.selectedMove = null;
-    player2.selectedMove = null;
-
-    await this.saveBattle(battleId, battle);
+    // 3. Reset moves and set next turn
+    fasterPlayer.selectedMove = null;
+    slowerPlayer.selectedMove = null;
+    battle.turn = fasterPlayer.teamId; // The player who went first gets to choose their move first next turn
+    battle.log.push(`--- End of Turn ---`);
+    battle.log.push(`It is now team ${fasterPlayer.teamId}'s turn.`);
   }
 
-  public async selectMove(battleId: number, socketId: string, move: string): Promise<BattleState | null> {
-    console.log(`[BattleManager] selectMove called for battle ${battleId}, socket ${socketId}, move ${move}. Current battles map size: ${this.battles.size}`);
-    const battle = this.battles.get(battleId);
-    if (!battle) {
-      console.log(`[BattleManager] Battle ${battleId} not found in map for selectMove.`);
-      return null;
+  private async broadcastState(battleId: number): Promise<void> {
+    if (!this.io) return;
+
+    const battleState = this.battles.get(battleId);
+    if (!battleState) return;
+
+    for (const player of Object.values(battleState.players)) {
+      if (player.socketId) {
+        this.io.to(player.socketId).emit('updateState', battleState);
+      }
     }
+    console.log(`[BattleManager] Broadcasted state for battle ${battleId}`);
+  }
+
+  public async selectMove(battleId: number, socketId: string, move: string): Promise<void> {
+    console.log(`[BattleManager] selectMove called for battle ${battleId}, socket ${socketId}, move ${move}.`);
+    const battle = this.battles.get(battleId);
+    if (!battle || !this.io) return;
 
     const currentPlayerTeamId = Object.values(battle.players).find(p => p.socketId === socketId)?.teamId;
-    if (!currentPlayerTeamId) {
-      return null;
-    }
+    if (!currentPlayerTeamId) return;
 
     if (battle.turn !== currentPlayerTeamId) {
       console.log(`[BattleManager] It's not player ${currentPlayerTeamId}'s turn.`);
-      // Optionally, emit an error to the client
-      if (this.io) {
-        this.io.to(socketId).emit('battleError', 'It is not your turn.');
-      }
-      return battle;
+      this.io.to(socketId).emit('battleError', 'It is not your turn.');
+      return;
     }
 
     const player = battle.players[currentPlayerTeamId];
     player.selectedMove = move;
-    battle.log.push(`${player.activePokemon.name} selected ${move}`);
+    battle.log.push(`${player.activePokemon.name} selected ${move}.`);
 
     const opponentTeamId = Object.keys(battle.players).map(Number).find(id => id !== currentPlayerTeamId);
-    if (!opponentTeamId) return null;
+    if (!opponentTeamId) return;
 
     const opponent = battle.players[opponentTeamId];
 
     if (opponent.selectedMove) {
-      battle.turnOrder = [battle.turn, opponentTeamId];
+      battle.log.push('Both players have selected moves. Executing turn...');
+      battle.turnOrder = [battle.turn, opponentTeamId]; // This needs to be based on speed, will fix in executeTurn
       await this.executeTurn(battleId);
-      battle.turn = opponentTeamId; // Switch turn to the other player
+      // After turn execution, the turn is switched inside executeTurn or right after
     } else {
-      // Waiting for the other player to make a move
       battle.log.push(`Waiting for opponent to select a move...`);
       battle.turn = opponentTeamId; // Switch turn to the other player
     }
 
     await this.saveBattle(battleId, battle);
-    return battle;
+    await this.broadcastState(battleId);
   }
 
-  public async switchPokemon(battleId: number, socketId: string, pokemonId: number): Promise<BattleState | null> {
-    console.log(`[BattleManager] switchPokemon called for battle ${battleId}, socket ${socketId}, pokemon ${pokemonId}. Current battles map size: ${this.battles.size}`);
+  public async switchPokemon(battleId: number, socketId: string, pokemonId: number): Promise<void> {
+    console.log(`[BattleManager] switchPokemon called for battle ${battleId}, socket ${socketId}, pokemon ${pokemonId}.`);
     const battle = this.battles.get(battleId);
-    if (!battle) {
-      console.log(`[BattleManager] Battle ${battleId} not found in map for switchPokemon.`);
-      return null;
-    }
+    if (!battle || !this.io) return;
 
     const currentPlayerTeamId = Object.values(battle.players).find(p => p.socketId === socketId)?.teamId;
-    if (!currentPlayerTeamId) {
-      console.log(`[BattleManager] Current player team ID not found for socket ${socketId}.`);
-      return null;
+    if (!currentPlayerTeamId) return;
+
+    if (battle.turn !== currentPlayerTeamId) {
+      console.log(`[BattleManager] It's not player ${currentPlayerTeamId}'s turn to switch.`);
+      this.io.to(socketId).emit('battleError', 'It is not your turn.');
+      return;
     }
 
     const player = battle.players[currentPlayerTeamId];
@@ -292,14 +384,14 @@ class BattleManager {
 
     if (!newPokemon) {
       battle.log.push(`${player.activePokemon.name} tried to switch to an unknown Pokémon.`);
-      console.log(`[BattleManager] Unknown Pokémon ${pokemonId} for player ${currentPlayerTeamId}.`);
-      return battle;
+      await this.broadcastState(battleId);
+      return;
     }
 
     if (newPokemon.currentHp <= 0) {
       battle.log.push(`${newPokemon.name} has fainted and cannot be switched in!`);
-      console.log(`[BattleManager] Pokémon ${newPokemon.name} has fainted.`);
-      return battle;
+      await this.broadcastState(battleId);
+      return;
     }
 
     // Find the index of the old active pokemon in the team array and update it
@@ -310,15 +402,24 @@ class BattleManager {
 
     const oldPokemonName = player.activePokemon ? player.activePokemon.name : "their team";
     player.activePokemon = newPokemon;
-    player.maxHp = newPokemon.hp; // Update maxHp for the new active Pokemon
+    player.maxHp = newPokemon.hp;
     battle.log.push(`Player ${player.teamId} switched from ${oldPokemonName} to ${newPokemon.name}!`);
-    console.log(`[BattleManager] Player ${currentPlayerTeamId} switched active Pokemon to ${newPokemon.name}. New activePokemon:`, player.activePokemon);
-    console.log(`[BattleManager] Player ${currentPlayerTeamId} new maxHp:`, player.maxHp);
 
-    // Turn does not change after a switch
+    // Switch turn to the other player
+    const opponentTeamId = Object.keys(battle.players).map(Number).find(id => id !== currentPlayerTeamId);
+    if (opponentTeamId) {
+      battle.turn = opponentTeamId;
+      battle.log.push(`It is now team ${opponentTeamId}'s turn.`);
+    }
+
     await this.saveBattle(battleId, battle);
-    return battle;
+    await this.broadcastState(battleId);
   }
 }
 
-export const battleManager = BattleManager.getInstance();
+export const battleManager = 
+  globalThis.battleManager || new BattleManager();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.battleManager = battleManager;
+}

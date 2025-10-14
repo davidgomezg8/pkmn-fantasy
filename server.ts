@@ -17,9 +17,9 @@ app.prepare().then(() => {
   });
 
   const io = new Server(server);
-  battleManager.setIo(io);
-
   const userSockets = new Map<number, string>();
+  battleManager.setIo(io);
+  battleManager.setUserSockets(userSockets);
 
   io.on('connection', (socket) => {
     console.log('A user connected', socket.id);
@@ -52,6 +52,21 @@ app.prepare().then(() => {
         }
       }
       console.log(`[SOCKET] Current userSockets map:`, Array.from(userSockets.entries()));
+    });
+
+    socket.on('joinBattle', (battleId: string, teamId: string) => {
+      console.log(`[SOCKET] User ${socket.id} is joining battle ${battleId} as team ${teamId}`);
+      battleManager.handlePlayerJoin(parseInt(battleId, 10), parseInt(teamId, 10), socket.id);
+    });
+
+    socket.on('selectMove', (battleId: string, move: string) => {
+      console.log(`[SOCKET] User ${socket.id} selected move ${move} in battle ${battleId}`);
+      battleManager.selectMove(parseInt(battleId, 10), socket.id, move);
+    });
+
+    socket.on('switchPokemon', (battleId: string, pokemonId: number) => {
+      console.log(`[SOCKET] User ${socket.id} switched to pokemon ${pokemonId} in battle ${battleId}`);
+      battleManager.switchPokemon(parseInt(battleId, 10), socket.id, pokemonId);
     });
   });
 
