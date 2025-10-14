@@ -20,6 +20,13 @@ enum LeagueStatus {
   COMPLETED
 }
 
+enum BattleStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
 // =======================================
 //               MODELS
 // =======================================
@@ -60,7 +67,7 @@ model Team {
 
 model Pokemon {
   id         Int    @id @default(autoincrement())
-  pokemonId  Int    @unique // The ID from the PokeAPI
+  pokemonId  Int    // The ID from the PokeAPI
   name       String
   image        String
   hp           Int
@@ -100,17 +107,26 @@ model Trade {
 }
 
 model Battle {
-  id         Int      @id @default(autoincrement())
+  id         Int          @id @default(autoincrement())
   leagueId   Int
   trainerAId Int
   trainerBId Int
   winnerId   Int?
   powerA     Int
   powerB     Int
-  createdAt  DateTime @default(now())
-  league     League   @relation(fields: [leagueId], references: [id])
-  trainerA   Team     @relation("BattlesAsTrainerA", fields: [trainerAId], references: [id])
-  trainerB   Team     @relation("BattlesAsTrainerB", fields: [trainerBId], references: [id])
+  createdAt  DateTime     @default(now())
+  status     BattleStatus @default(PENDING)
+  currentTurn Int         @default(0)
+  log        Json
+  pokemonAState Json
+  pokemonBState Json
+  activePokemonAId Int?
+  activePokemonBId Int?
+  turnOrder  Json
+
+  league     League       @relation(fields: [leagueId], references: [id])
+  trainerA   Team         @relation("BattlesAsTrainerA", fields: [trainerAId], references: [id])
+  trainerB   Team         @relation("BattlesAsTrainerB", fields: [trainerBId], references: [id])
 
   @@index([leagueId])
   @@index([trainerAId])

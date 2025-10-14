@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import io, { Socket } from 'socket.io-client';
 
 interface User {
   id: number;
@@ -40,6 +41,8 @@ export default function LeagueDetailsPage() {
   const [leaguePokemons, setLeaguePokemons] = useState<Pokemon[]>([]);
   const [allAvailablePokemons, setAllAvailablePokemons] = useState<Pokemon[]>([]);
   const [showAddPokemonModal, setShowAddPokemonModal] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [incomingChallenge, setIncomingChallenge] = useState<{ from: string, battleId: number } | null>(null);
 
   const fetchLeagueDetails = async () => {
     try {
@@ -95,6 +98,38 @@ export default function LeagueDetailsPage() {
     }
     setLoading(false);
   }, [leagueId, status]);
+
+  useEffect(() => {
+    const newSocket = io();
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      console.log('Connected to socket server');
+      if (session?.user) {
+        newSocket.emit('registerUser', parseInt((session.user as any).id, 10));
+      }
+    });
+
+    newSocket.on('challenge', ({ from, battleId }) => {
+      console.log('Received challenge event:', { from, battleId });
+      setIncomingChallenge({ from, battleId });
+    });
+
+    newSocket.on('battleAccepted', ({ battleId, myTeamId }) => {
+      console.log('Received battleAccepted event:', { battleId, myTeamId });
+      setIncomingChallenge(null); // Clear any incoming challenge
+      router.push(`/battle/live/${battleId}?myTeamId=${myTeamId}`);
+    });
+
+    newSocket.on('battleRejected', ({ battleId }) => {
+      setIncomingChallenge(null); // Clear any incoming challenge
+      setMessage('Tu desafío ha sido rechazado.');
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [session]);
 
   const handleAddPokemonToLeague = async (pokemonId: number) => {
     console.log('Attempting to add Pokémon with ID:', pokemonId, 'to league:', leagueId);
@@ -243,11 +278,55 @@ export default function LeagueDetailsPage() {
       }
 
       const battleResult = await response.json();
-      const myTeam = league?.teams.find(team => team.userId === parseInt((session?.user as any).id, 10));
-      router.push(`/battle/live/${battleResult.id}?myTeamId=${myTeam?.id}`);
+      
+      // Emit challenge event to the opponent
+      if (socket) {
+        const opponentTeam = league?.teams.find(team => team.id === opponentTeamId);
+        if (opponentTeam) {
+          socket.emit('challenge', {
+            toUserId: opponentTeam.userId,
+            from: session.user.email,
+            battleId: battleResult.id,
+          });
+        }
+      }
+
+      setMessage('Desafío enviado. Esperando respuesta del oponente.');
 
     } catch (err: any) {
       setMessage(err.message);
+    }
+  };
+
+  const handleAcceptChallenge = async () => {
+    if (incomingChallenge) {
+      try {
+        const response = await fetch(`/api/battles/${incomingChallenge.battleId}/accept`, {
+          method: 'POST',
+        });
+        if (!response.ok) {
+          throw new Error('Failed to accept challenge');
+        }
+        const myTeam = league?.teams.find(team => team.userId === parseInt((session?.user as any).id, 10));
+        router.push(`/battle/live/${incomingChallenge.battleId}?myTeamId=${myTeam?.id}`);
+      } catch (error) {
+        console.error(error);
+        setMessage('Error al aceptar el desafío.');
+      }
+    }
+  };
+
+  const handleRejectChallenge = async () => {
+    if (incomingChallenge) {
+      try {
+        await fetch(`/api/battles/${incomingChallenge.battleId}/reject`, {
+          method: 'POST',
+        });
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIncomingChallenge(null);
+      }
     }
   };
 
@@ -265,7 +344,7 @@ export default function LeagueDetailsPage() {
 
   const isCreator = session && session.user && league.creatorId === parseInt((session.user as any).id, 10);
   const isMember = session && session.user && league.teams.some(team => team.userId === parseInt((session.user as any).id, 10));
-  const canGenerateTeams = isCreator && league.status === 'OPEN' && league.teams.length >= 2;
+  const canGenerateTeams = isCreator && (league.status === 'OPEN' || league.status === 'TEAMS_GENERATED') && league.teams.length >= 2;
 
   return (
     <div className="container mt-5">
@@ -301,7 +380,7 @@ export default function LeagueDetailsPage() {
 
       {canGenerateTeams && (
         <button onClick={handleGenerateTeams} className="btn btn-primary mt-4">
-          Generar Pokémon Aleatorios
+          {league.status === 'OPEN' ? 'Generar Pokémon Aleatorios' : 'Regenerar Pokémon de Equipos'}
         </button>
       )}
 
@@ -316,7 +395,7 @@ export default function LeagueDetailsPage() {
               <div className="row">
                 {leaguePokemons.map(pokemon => (
                   <div key={pokemon.id} className="col-md-2 mb-3 text-center">
-                    <img src={`/api/pokemon/sprite/${pokemon.id}`} alt={pokemon.name} width={50} height={50} />
+                    <img src={`/api/pokemon/sprite/${pokemon.pokemonId}`} alt={pokemon.name} width={50} height={50} />
                     <p>{pokemon.name}</p>
                     <button
                       onClick={() => handleRemovePokemonFromLeague(pokemon.id)}
@@ -345,7 +424,7 @@ export default function LeagueDetailsPage() {
               <div className="row">
                 {allAvailablePokemons.map(pokemon => (
                   <div key={pokemon.id} className="col-md-2 mb-3 text-center">
-                    <img src={`/api/pokemon/sprite/${pokemon.id}`} alt={pokemon.name} width={50} height={50} />
+                    <img src={`/api/pokemon/sprite/${pokemon.pokemonId}`} alt={pokemon.name} width={50} height={50} />
                     <p>{pokemon.name}</p>
                     <button
                       onClick={() => handleAddPokemonToLeague(pokemon.id)}
@@ -364,6 +443,25 @@ export default function LeagueDetailsPage() {
       )}
 
       {message && <div className="alert alert-info mt-3">{message}</div>}
+
+      {incomingChallenge && (
+        <div className="modal" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">¡Te han desafiado!</h5>
+              </div>
+              <div className="modal-body">
+                <p>{incomingChallenge.from} te ha desafiado a una batalla.</p>
+              </div>
+              <div className="modal-footer">
+                <button onClick={handleRejectChallenge} className="btn btn-secondary">Rechazar</button>
+                <button onClick={handleAcceptChallenge} className="btn btn-primary">Aceptar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

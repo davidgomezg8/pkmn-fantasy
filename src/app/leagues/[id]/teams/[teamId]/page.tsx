@@ -7,6 +7,7 @@ import Link from 'next/link';
 
 interface Pokemon {
   id: number;
+  pokemonId: number;
   name: string;
 }
 
@@ -143,7 +144,7 @@ export default function TeamPage() {
           {viewedTeam.pokemons.map(pokemon => (
             <div key={pokemon.id} className="col-md-3 mb-4 text-center">
               <div className="card">
-                <img src={`/api/pokemon/sprite/${pokemon.id}`} className="card-img-top" alt={pokemon.name} style={{width: '128px', height: '128px', margin: 'auto'}} />
+                <img src={`/api/pokemon/sprite/${pokemon.pokemonId}`} className="card-img-top" alt={pokemon.name} style={{width: '128px', height: '128px', margin: 'auto'}} />
                 <div className="card-body">
                   <h5 className="card-title text-capitalize">{pokemon.name}</h5>
                   {!isMyTeam && myTeam ? (
@@ -178,7 +179,7 @@ export default function TeamPage() {
                         onClick={() => setOfferedPokemon(p)}
                         style={{cursor: 'pointer'}}
                       >
-                        <img src={`/api/pokemon/sprite/${p.id}`} className="card-img-top" alt={p.name} style={{width: '96px', height: '96px', margin: 'auto'}} />
+                        <img src={`/api/pokemon/sprite/${p.pokemonId}`} className="card-img-top" alt={p.name} style={{width: '96px', height: '96px', margin: 'auto'}} />
                         <div className="card-body">
                           <h6 className="card-title text-capitalize">{p.name}</h6>
                         </div>

@@ -17,44 +17,41 @@ app.prepare().then(() => {
   });
 
   const io = new Server(server);
+  battleManager.setIo(io);
+
+  const userSockets = new Map<number, string>();
 
   io.on('connection', (socket) => {
     console.log('A user connected', socket.id);
 
-    socket.on('joinBattle', async (battleId: string, teamId: string) => {
-      console.log(`Socket ${socket.id} joining battle ${battleId}`);
-      const parsedBattleId = parseInt(battleId, 10);
-      const parsedTeamId = parseInt(teamId, 10);
-      const battle = await battleManager.getBattle(parsedBattleId);
-      // This is a placeholder for getting the team from the database
-      const team = await prisma.team.findUnique({ where: { id: parsedTeamId }, include: { pokemons: true } });
-      if (team) {
-        battleManager.addPlayer(parsedBattleId, socket.id, parsedTeamId);
-        socket.join(parsedBattleId.toString());
-        io.to(parsedBattleId.toString()).emit('updateState', battle);
-      }
+    socket.on('registerUser', (userId: number) => {
+      console.log(`[SOCKET] Registering user ${userId} with socket ${socket.id}`);
+      userSockets.set(userId, socket.id);
+      console.log(`[SOCKET] Current userSockets map:`, Array.from(userSockets.entries()));
     });
 
-    socket.on('selectMove', (battleId: number, move: string) => {
-      console.log(`Socket ${socket.id} selected move ${move} in battle ${battleId}`);
-      const battle = battleManager.selectMove(battleId, socket.id, move);
-      if (battle) {
-        io.to(battleId.toString()).emit('updateState', battle);
-      }
-    });
-
-    socket.on('switchPokemon', (battleId: string, pokemonId: number) => {
-      const parsedBattleId = parseInt(battleId, 10);
-      console.log(`[Server] Socket ${socket.id} received switchPokemon event for battle ${parsedBattleId}, pokemon ${pokemonId}`);
-      const battle = battleManager.switchPokemon(parsedBattleId, socket.id, pokemonId);
-      if (battle) {
-        console.log(`[Server] Battle state after switchPokemon:`, battle);
-        io.to(parsedBattleId.toString()).emit('updateState', battle);
+    socket.on('challenge', ({ toUserId, from, battleId }) => {
+      console.log(`[SOCKET] Challenge from ${from} to user ${toUserId} for battle ${battleId}`);
+      const toSocketId = userSockets.get(toUserId);
+      if (toSocketId) {
+        console.log(`[SOCKET] Emitting challenge to socket ${toSocketId} for user ${toUserId}`);
+        io.to(toSocketId).emit('challenge', { from, battleId });
+      } else {
+        console.log(`[SOCKET] User ${toUserId} not found in userSockets map.`);
       }
     });
 
     socket.on('disconnect', () => {
-      console.log('User disconnected', socket.id);
+      console.log('[SOCKET] User disconnected', socket.id);
+      // Remove user from map on disconnect
+      for (const [userId, socketId] of userSockets.entries()) {
+        if (socketId === socket.id) {
+          userSockets.delete(userId);
+          console.log(`[SOCKET] User ${userId} removed from userSockets map.`);
+          break;
+        }
+      }
+      console.log(`[SOCKET] Current userSockets map:`, Array.from(userSockets.entries()));
     });
   });
 

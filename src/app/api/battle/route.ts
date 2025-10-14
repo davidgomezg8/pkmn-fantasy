@@ -58,6 +58,14 @@ export async function POST(request: Request) {
         winnerId,
         powerA: battleResult.powerA,
         powerB: battleResult.powerB,
+        status: 'PENDING', // Initial status
+        currentTurn: 0,
+        log: [], // Empty JSON array
+        pokemonAState: {}, // Empty JSON object
+        pokemonBState: {}, // Empty JSON object
+        activePokemonAId: null,
+        activePokemonBId: null,
+        turnOrder: [], // Empty JSON array
       },
     });
 

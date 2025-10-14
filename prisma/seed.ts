@@ -7,6 +7,8 @@ async function main() {
   console.log('Start seeding ...');
 
   // Limpiar datos existentes (en orden inverso de dependencia)
+  await prisma.battle.deleteMany();
+  await prisma.trade.deleteMany();
   await prisma.pokemon.deleteMany();
   await prisma.team.deleteMany();
   await prisma.league.deleteMany();
@@ -81,9 +83,24 @@ async function main() {
       data.moves.slice(0, 4).map(async (moveEntry: any) => {
         const moveResponse = await fetch(moveEntry.move.url);
         const moveDetails = await moveResponse.json();
+        let category: 'physical' | 'special' | 'status';
+        switch (moveDetails.damage_class.name) {
+          case 'physical':
+            category = 'physical';
+            break;
+          case 'special':
+            category = 'special';
+            break;
+          case 'status':
+            category = 'status';
+            break;
+          default:
+            category = 'status'; // Default to status if unknown
+        }
         return {
           name: moveDetails.name,
           power: moveDetails.power || 0,
+          category: category,
         };
       })
     );
@@ -95,20 +112,26 @@ async function main() {
       hp: stats.hp || 0,
       attack: stats.attack || 0,
       defense: stats.defense || 0,
-      specialAttack: stats['special-attack'] || 0,
-      specialDefense: stats['special-defense'] || 0,
+      specialAttack: stats.specialattack || 0,
+      specialDefense: stats.specialdefense || 0,
       speed: stats.speed || 0,
       leagueId: null, // Assign to Kanto League
       teamId: null,
       order: 0,
       moves: movesData, // Add moves data
     });
+    console.log(`Seeding Pokemon: ${data.name}, leagueId: null`);
   }
 
   await prisma.pokemon.createMany({
     data: pokemonData,
   });
   console.log(`Seeded ${POKEMON_COUNT} Pokémon.`);
+
+  const countMasterPokemons = await prisma.pokemon.count({
+    where: { leagueId: null },
+  });
+  console.log(`Number of master Pokemons in DB after seeding: ${countMasterPokemons}`);
 
   console.log('Seeding finished.');
   console.log(`Created league: ${kantoLeague.name} (ID: ${kantoLeague.id})`);

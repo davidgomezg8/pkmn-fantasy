@@ -121,7 +121,7 @@ export default function LiveBattlePage() {
 
 
 
-      newSocket.on('updateState', (state) => {
+            newSocket.on('updateState', (state) => {
 
 
 
@@ -129,11 +129,7 @@ export default function LiveBattlePage() {
 
 
 
-        setBattleState(state);
-
-
-
-        setMenuState('main'); // Reset menu state on battle state update
+  
 
 
 
@@ -141,7 +137,55 @@ export default function LiveBattlePage() {
 
 
 
-      });
+              console.log('Received updateState event:', state);
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+              setBattleState(state);
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+              setMenuState('main'); // Reset menu state on battle state update
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+            });
 
 
 
@@ -1065,7 +1109,7 @@ export default function LiveBattlePage() {
 
 
 
-                <HealthBar currentHp={opponentPlayer.activePokemon.hp} maxHp={opponentPlayer.maxHp} />
+                <HealthBar currentHp={opponentPlayer.activePokemon.currentHp} maxHp={opponentPlayer.maxHp} />
 
 
 
@@ -1353,7 +1397,7 @@ export default function LiveBattlePage() {
 
 
 
-                <HealthBar currentHp={myPlayer.activePokemon.hp} maxHp={myPlayer.maxHp} />
+                <HealthBar currentHp={myPlayer.activePokemon.currentHp} maxHp={myPlayer.maxHp} />
 
 
 

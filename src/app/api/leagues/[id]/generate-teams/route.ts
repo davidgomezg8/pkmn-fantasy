@@ -38,7 +38,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               console.log(`[GenerateTeams API] No players in league ${leagueId}.`);
               return NextResponse.json({ message: 'No hay jugadores en la liga para generar equipos.' }, { status: 400 });
             }
-      
+
+    // --- New Logic: Unassign existing Pokémon from teams in this league ---
+    await prisma.pokemon.updateMany({
+      where: {
+        leagueId: leagueId,
+        NOT: { teamId: null }, // Only unassign pokemons that are currently on a team
+      },
+      data: {
+        teamId: null,
+        order: 0,
+      },
+    });
+    // --- End New Logic ---
+
             // 2. Fetch all available Pokémon from this league's pool (not assigned to any team)
             const availablePokemon = await prisma.pokemon.findMany({
               where: {
