@@ -16,7 +16,7 @@ export async function GET(
 
   const { id } = params;
   const leagueId = parseInt(id);
-  // @ts-expect-error
+  // @ts-expect-error: NextAuth session.user.id type mismatch
   const userId = parseInt(session.user.id as string);
   
   console.log(`[GET /api/leagues/[id]/team] Searching for team with leagueId: ${leagueId}, userId: ${userId}`);

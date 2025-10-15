@@ -25,7 +25,7 @@ export async function POST(
         where: {
             id: teamId,
             leagueId: leagueId,
-            // @ts-expect-error
+            // @ts-expect-error: NextAuth session.user.id type mismatch
             userId: parseInt(session.user.id as string),
         }
     });

@@ -10,9 +10,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    // @ts-expect-error
-    const userId = parseInt(session.user.id as string, 10);
-
+      // @ts-expect-error: NextAuth session.user.id type mismatch
+      const userId = parseInt(session.user.id as string, 10);
     if (isNaN(userId)) {
       return NextResponse.json({ message: 'ID de usuario inválido en la sesión.' }, { status: 400 });
     }

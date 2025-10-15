@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
     }
     
-    // @ts-expect-error
+    // @ts-expect-error: NextAuth session.user.id type mismatch
     const currentUserId = parseInt(session.user.id as string, 10);
 
     // 2. Check if proposingTeamId belongs to the current user

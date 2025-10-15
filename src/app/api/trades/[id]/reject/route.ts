@@ -14,7 +14,7 @@ export async function POST(
 
   try {
     const tradeId = parseInt(params.id);
-    // @ts-expect-error
+    // @ts-expect-error: NextAuth session.user.id type mismatch
     const currentUserId = parseInt(session.user.id as string);
 
     // 1. Find the trade and verify it's pending
