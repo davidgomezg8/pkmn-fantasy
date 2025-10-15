@@ -7,10 +7,10 @@ export async function GET(request: Request) {
   const session = await getServerSession(authOptions); // Pass authOptions here
   if (!session || !session.user) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-    const currentUserId = parseInt(session.user.id as string, 10);
-
+  } 
+  
+    try {
+      const currentUserId = parseInt(session.user.id as string, 10);
     if (isNaN(currentUserId)) {
         return NextResponse.json({ message: 'Invalid user ID in session.' }, { status: 400 });
     }
