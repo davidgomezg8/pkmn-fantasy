@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // =======================================
@@ -63,6 +63,7 @@ model Team {
   targetedTrades   Trade[] @relation("TargetedTrades")
   battlesAsTrainerA Battle[] @relation("BattlesAsTrainerA")
   battlesAsTrainerB Battle[] @relation("BattlesAsTrainerB")
+  points            Int      @default(0)
 }
 
 model Pokemon {

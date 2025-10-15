@@ -28,6 +28,8 @@ interface BattleState {
   log: string[];
   status: BattleStatus; // Current status of the battle
   turnOrder: number[]; // Array of teamIds in turn order
+  winnerId: number | null; // New field for winner
+  leagueId: number; // Add leagueId to BattleState
 }
 
 class BattleManager {
@@ -230,6 +232,8 @@ class BattleManager {
       log: (battle.log as unknown as string[]) || [],
       status: battle.status || 'PENDING',
       turnOrder: (battle.turnOrder as unknown as number[]) || [],
+      winnerId: battle.winnerId || null, // Initialize winnerId
+      leagueId: battle.leagueId, // Populate leagueId
     };
 
     this.battles.set(battleId, battleState);
@@ -261,8 +265,42 @@ class BattleManager {
         activePokemonAId: battleState.players[trainerAId].activePokemon.id,
         activePokemonBId: battleState.players[trainerBId].activePokemon.id,
         turnOrder: battleState.turnOrder as Prisma.JsonArray,
+        winnerId: battleState.winnerId, // Save winnerId
       },
     });
+  }
+
+  private checkAllPokemonFainted(player: PlayerBattleState): boolean {
+    return player.team.every(p => p.currentHp <= 0);
+  }
+
+  private async handleBattleEnd(battleId: number, winnerTeamId: number, loserTeamId: number, battleState: BattleState): Promise<void> {
+    battleState.status = 'COMPLETED';
+    battleState.winnerId = winnerTeamId;
+    battleState.log.push(`¡Combate finalizado! El equipo ${winnerTeamId} ha ganado.`);
+
+    // Update points in DB
+    await prisma.team.update({
+      where: { id: winnerTeamId },
+      data: { points: { increment: 1 } },
+    });
+
+    // Save final battle state
+    await this.saveBattle(battleId, battleState);
+
+    // Emit battleEnded event to both players
+    for (const player of Object.values(battleState.players)) {
+      if (player.socketId) {
+        console.log(`[BattleManager] Emitting battleEnded to team ${player.teamId} on socket ${player.socketId}`);
+        this.io?.to(player.socketId).emit('battleEnded', {
+          winnerId: winnerTeamId,
+          loserId: loserTeamId,
+          message: `¡Combate finalizado! El equipo ${winnerTeamId} ha ganado.`,
+        });
+      }
+    }
+    console.log(`[BattleManager] Battle ${battleId} ended. Winner: ${winnerTeamId}`);
+    this.battles.delete(battleId); // Remove battle from memory
   }
 
   private async executeTurn(battleId: number): Promise<void> {
@@ -294,8 +332,15 @@ class BattleManager {
     if (slowerPlayer.activePokemon.currentHp <= 0) {
       slowerPlayer.activePokemon.currentHp = 0;
       battle.log.push(`${slowerPlayer.activePokemon.name} has fainted!`);
-    } else {
-      // 2. Slower player attacks
+      // Check for battle end
+      if (this.checkAllPokemonFainted(slowerPlayer)) {
+        await this.handleBattleEnd(battleId, fasterPlayer.teamId, slowerPlayer.teamId, battle);
+        return; // Battle ended
+      }
+    }
+
+    // 2. Slower player attacks (only if still active)
+    if (fasterPlayer.activePokemon.currentHp > 0) { // Check if faster player's pokemon is still active
       damage = calculateDamage(slowerPlayer.activePokemon, fasterPlayer.activePokemon, slowerMove);
       fasterPlayer.activePokemon.currentHp -= damage;
       battle.log.push(`${slowerPlayer.activePokemon.name} used ${slowerMove.name} and dealt ${damage} damage to ${fasterPlayer.activePokemon.name}.`);
@@ -303,6 +348,11 @@ class BattleManager {
       if (fasterPlayer.activePokemon.currentHp <= 0) {
         fasterPlayer.activePokemon.currentHp = 0;
         battle.log.push(`${fasterPlayer.activePokemon.name} has fainted!`);
+        // Check for battle end
+        if (this.checkAllPokemonFainted(fasterPlayer)) {
+          await this.handleBattleEnd(battleId, slowerPlayer.teamId, fasterPlayer.teamId, battle);
+          return; // Battle ended
+        }
       }
     }
 
@@ -333,6 +383,12 @@ class BattleManager {
     const battle = this.battles.get(battleId);
     if (!battle || !this.io) return;
 
+    // If battle is already completed, do nothing
+    if (battle.status === 'COMPLETED') {
+      this.io.to(socketId).emit('battleError', 'Battle is already completed.');
+      return;
+    }
+
     const currentPlayerTeamId = Object.values(battle.players).find(p => p.socketId === socketId)?.teamId;
     if (!currentPlayerTeamId) return;
 
@@ -343,6 +399,12 @@ class BattleManager {
     }
 
     const player = battle.players[currentPlayerTeamId];
+    // Check if active pokemon is fainted
+    if (player.activePokemon.currentHp <= 0) {
+      this.io.to(socketId).emit('battleError', 'Your active Pokémon has fainted. You must switch.');
+      await this.broadcastState(battleId); // Ensure client knows to switch
+      return;
+    }
     player.selectedMove = move;
     battle.log.push(`${player.activePokemon.name} selected ${move}.`);
 
@@ -366,9 +428,14 @@ class BattleManager {
   }
 
   public async switchPokemon(battleId: number, socketId: string, pokemonId: number): Promise<void> {
-    console.log(`[BattleManager] switchPokemon called for battle ${battleId}, socket ${socketId}, pokemon ${pokemonId}.`);
     const battle = this.battles.get(battleId);
     if (!battle || !this.io) return;
+
+    // If battle is already completed, do nothing
+    if (battle.status === 'COMPLETED') {
+      this.io.to(socketId).emit('battleError', 'Battle is already completed.');
+      return;
+    }
 
     const currentPlayerTeamId = Object.values(battle.players).find(p => p.socketId === socketId)?.teamId;
     if (!currentPlayerTeamId) return;
@@ -404,6 +471,13 @@ class BattleManager {
     player.activePokemon = newPokemon;
     player.maxHp = newPokemon.hp;
     battle.log.push(`Player ${player.teamId} switched from ${oldPokemonName} to ${newPokemon.name}!`);
+
+    // Check if the player has any non-fainted pokemon left after switch (relevant if forced switch)
+    if (player.activePokemon.currentHp <= 0 && this.checkAllPokemonFainted(player)) {
+      const opponentTeamId = Object.keys(battle.players).map(Number).find(id => id !== currentPlayerTeamId)!;
+      await this.handleBattleEnd(battleId, opponentTeamId, currentPlayerTeamId, battle);
+      return; // Battle ended
+    }
 
     // Switch turn to the other player
     const opponentTeamId = Object.keys(battle.players).map(Number).find(id => id !== currentPlayerTeamId);

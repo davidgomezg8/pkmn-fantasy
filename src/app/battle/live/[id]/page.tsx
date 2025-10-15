@@ -15,6 +15,7 @@ export default function LiveBattlePage() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [battleState, setBattleState] = useState<any>(null);
   const [menuState, setMenuState] = useState<'main' | 'moves' | 'switch'>('main');
+  const [battleEnded, setBattleEnded] = useState<{ winnerId: number | null; message: string } | null>(null);
 
   // Socket connection and event listeners
   useEffect(() => {
@@ -37,6 +38,11 @@ export default function LiveBattlePage() {
       // Optionally, display the error to the user
     });
 
+    newSocket.on('battleEnded', ({ winnerId, message }) => {
+      console.log('Received battleEnded event:', { winnerId, message });
+      setBattleEnded({ winnerId, message });
+    });
+
     return () => {
       newSocket.disconnect();
     };
@@ -44,7 +50,7 @@ export default function LiveBattlePage() {
 
   // Handles automatically switching to the 'switch' menu when a Pokémon faints
   useEffect(() => {
-    if (battleState && myTeamId) {
+    if (battleState && myTeamId && !battleEnded) {
       const myPlayer = battleState.players[parseInt(myTeamId, 10)];
       if (myPlayer && myPlayer.activePokemon.currentHp === 0 && menuState !== 'switch') {
         const hasSwitchablePokemon = myPlayer.team.some((p: any) => p.currentHp > 0);
@@ -56,7 +62,7 @@ export default function LiveBattlePage() {
           }
         }
     }
-  }, [battleState, myTeamId, menuState]);
+  }, [battleState, myTeamId, menuState, battleEnded]);
 
 
   const handleSelectMove = (move: string) => {
@@ -129,45 +135,60 @@ export default function LiveBattlePage() {
 
         <div className="row battle-controls mt-4">
           <div className="col-12 text-center">
-            {myPlayer && battleState.turn === myPlayer.teamId ? (
-              <div className="d-flex justify-content-center gap-3 flex-wrap">
-                {menuState === 'main' && myPlayer.activePokemon.currentHp > 0 && (
-                  <>
-                    <button onClick={handleFightClick} className="btn btn-primary btn-lg">Luchar</button>
-                    <button onClick={handleSwitchPokemonClick} className="btn btn-info btn-lg">Pokémon</button>
-                  </>
-                )}
-                {menuState === 'moves' && (
-                  <>
-                    {myPlayer.activePokemon.moves.map((move: Move) => (
-                      <button key={move.name} onClick={() => handleSelectMove(move.name)} className="btn btn-primary btn-lg">
-                        {move.name}
-                      </button>
-                    ))}
-                    <button onClick={() => setMenuState('main')} className="btn btn-secondary btn-lg">Atrás</button>
-                  </>
-                )}
-                {menuState === 'switch' && (
-                  <>
-                    {myPlayer.team.map((pokemon: any) => (
-                      <button 
-                        key={pokemon.id} 
-                        onClick={() => handleSwitchPokemon(pokemon.id)}
-                        className="btn btn-warning btn-lg"
-                        disabled={pokemon.id === myPlayer.activePokemon.id || pokemon.currentHp === 0}
-                      >
-                        {pokemon.name} (HP: {pokemon.currentHp} / {pokemon.hp})
-                      </button>
-                    ))}
-                    {/* Do not show back button if a pokemon fainted and player is forced to switch*/}
-                    {myPlayer.activePokemon.currentHp > 0 && 
-                      <button onClick={() => setMenuState('main')} className="btn btn-secondary btn-lg">Atrás</button>
-                    }
-                  </>
-                )}
+            {battleEnded ? (
+              <div className="battle-end-message mt-4">
+                <h2>{battleEnded.message}</h2>
+                <button 
+                  onClick={() => {
+                    console.log('Redirecting to league:', battleState.leagueId);
+                    window.location.href = `/leagues/${battleState.leagueId}`;
+                  }}
+                  className="btn btn-success btn-lg mt-3"
+                >
+                  Volver a la Liga
+                </button>
               </div>
             ) : (
-              <p>Esperando al oponente...</p>
+              myPlayer && battleState.turn === myPlayer.teamId ? (
+                <div className="d-flex justify-content-center gap-3 flex-wrap">
+                  {menuState === 'main' && myPlayer.activePokemon.currentHp > 0 && (
+                    <>
+                      <button onClick={handleFightClick} className="btn btn-primary btn-lg">Luchar</button>
+                      <button onClick={handleSwitchPokemonClick} className="btn btn-info btn-lg">Pokémon</button>
+                    </>
+                  )}
+                  {menuState === 'moves' && (
+                    <>
+                      {myPlayer.activePokemon.moves.map((move: Move) => (
+                        <button key={move.name} onClick={() => handleSelectMove(move.name)} className="btn btn-primary btn-lg">
+                          {move.name}
+                        </button>
+                      ))}
+                      <button onClick={() => setMenuState('main')} className="btn btn-secondary btn-lg">Atrás</button>
+                    </>
+                  )}
+                  {menuState === 'switch' && (
+                    <>
+                      {myPlayer.team.map((pokemon: any) => (
+                        <button 
+                          key={pokemon.id} 
+                          onClick={() => handleSwitchPokemon(pokemon.id)}
+                          className="btn btn-warning btn-lg"
+                          disabled={pokemon.id === myPlayer.activePokemon.id || pokemon.currentHp === 0}
+                        >
+                          {pokemon.name} (HP: {pokemon.currentHp} / {pokemon.hp})
+                        </button>
+                      ))}
+                      {/* Do not show back button if a pokemon fainted and player is forced to switch*/}
+                      {myPlayer.activePokemon.currentHp > 0 && 
+                        <button onClick={() => setMenuState('main')} className="btn btn-secondary btn-lg">Atrás</button>
+                      }
+                    </>
+                  )}
+                </div>
+              ) : (
+                <p>Esperando al oponente...</p>
+              )
             )}
           </div>
         </div>
