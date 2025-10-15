@@ -11,13 +11,13 @@ export interface League {
 
 // --- DATOS SIMULADOS ---
 
-export let users: User[] = [
+export const users: User[] = [
   { id: 1, name: 'Ash Ketchum' },
   { id: 2, name: 'Misty' },
   { id: 3, name: 'Brock' },
 ];
 
-export let leagues: League[] = [
+export const leagues: League[] = [
   {
     id: 101,
     name: 'Liga Añil de Kanto',

@@ -22,7 +22,7 @@ export default function Navbar() {
 
       newSocket.on("connect", () => {
         console.log("Connected to socket server from Navbar");
-        newSocket.emit("registerUser", parseInt((session.user as any).id, 10));
+        newSocket.emit("registerUser", parseInt(session.user.id as string, 10));
       });
 
       newSocket.on("challenge", ({ from, battleId }) => {
