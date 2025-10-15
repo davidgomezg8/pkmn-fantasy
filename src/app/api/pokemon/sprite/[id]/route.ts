@@ -36,7 +36,7 @@ export async function GET(
         'Cache-Control': 'no-cache', // Disable cache for debugging
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`[SPRITE PROXY] CRITICAL ERROR fetching image for ID ${id}:`, error);
     // Check for proxy-related errors
     if (error.cause?.code) {

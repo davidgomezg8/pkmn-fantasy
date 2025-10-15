@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const userId = parseInt((session.user as any).id, 10);
+    const userId = parseInt(session.user.id as string, 10);
     const { pokemonIds } = await request.json(); // Expects an array of Pokémon IDs in the new order
 
     if (!Array.isArray(pokemonIds)) {

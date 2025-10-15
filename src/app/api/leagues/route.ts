@@ -10,8 +10,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    // @ts-ignore
-    const userId = parseInt(session.user.id, 10);
+    // @ts-expect-error
+    const userId = parseInt(session.user.id as string, 10);
 
     if (isNaN(userId)) {
       return NextResponse.json({ message: 'ID de usuario inválido en la sesión.' }, { status: 400 });

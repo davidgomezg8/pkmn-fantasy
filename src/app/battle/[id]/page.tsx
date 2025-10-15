@@ -40,7 +40,7 @@ export default function BattleResultPage() {
         }
         const data = await response.json();
         setResult(data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         setError(err.message);
       } finally {
         setLoading(false);

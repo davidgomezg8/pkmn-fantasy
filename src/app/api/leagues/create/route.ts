@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   try {
     const { name, maxPlayers } = await request.json();
-    const creatorId = parseInt((session.user as any).id, 10);
+    const creatorId = parseInt(session.user.id as string, 10);
 
     if (!name || !maxPlayers) {
       return NextResponse.json({ message: 'Nombre de liga y número máximo de jugadores son requeridos.' }, { status: 400 });

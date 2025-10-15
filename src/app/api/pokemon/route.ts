@@ -7,7 +7,7 @@ async function getPokemonDetails(url: string) {
   const data = await response.json();
 
   // Transformamos el array de stats en un objeto más manejable (ej: { hp: 45, attack: 49, ... })
-  const stats = data.stats.reduce((acc: any, statEntry: any) => {
+  const stats = data.stats.reduce((acc: Record<string, number>, statEntry: { stat: { name: string }, base_stat: number }) => {
     acc[statEntry.stat.name] = statEntry.base_stat;
     return acc;
   }, {});
@@ -16,7 +16,7 @@ async function getPokemonDetails(url: string) {
   console.log('Processed stats for', data.name, ':', stats);
 
   const movesData = await Promise.all(
-    data.moves.slice(0, 4).map(async (moveEntry: any) => {
+    data.moves.slice(0, 4).map(async (moveEntry: { move: { url: string } }) => {
       const moveResponse = await fetch(moveEntry.move.url);
       const moveDetails = await moveResponse.json();
       return {

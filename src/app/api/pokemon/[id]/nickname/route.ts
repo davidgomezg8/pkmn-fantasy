@@ -13,7 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const pokemonId = parseInt((await params).id, 10);
     const { nickname } = await request.json();
-    const userId = parseInt((session.user as any).id, 10);
+    const userId = parseInt(session.user.id as string, 10);
 
     if (isNaN(pokemonId)) {
       return NextResponse.json({ message: 'ID de Pokémon inválido.' }, { status: 400 });

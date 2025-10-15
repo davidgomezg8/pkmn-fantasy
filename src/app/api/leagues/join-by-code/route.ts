@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 
   try {
     const { joinCode } = await request.json();
-    const userId = parseInt((session.user as any).id, 10);
+    const userId = parseInt(session.user.id as string, 10);
 
     if (!joinCode) {
       return NextResponse.json({ message: 'Código de unión es requerido.' }, { status: 400 });

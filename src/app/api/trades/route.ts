@@ -9,9 +9,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
-  try {
-    // @ts-ignore
-    const currentUserId = parseInt(session.user.id);
+    const currentUserId = parseInt(session.user.id as string, 10);
 
     if (isNaN(currentUserId)) {
         return NextResponse.json({ message: 'Invalid user ID in session.' }, { status: 400 });
@@ -72,8 +70,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
     }
     
-    // @ts-ignore
-    const currentUserId = parseInt(session.user.id);
+    // @ts-expect-error
+    const currentUserId = parseInt(session.user.id as string, 10);
 
     // 2. Check if proposingTeamId belongs to the current user
     const proposingTeam = await prisma.team.findFirst({

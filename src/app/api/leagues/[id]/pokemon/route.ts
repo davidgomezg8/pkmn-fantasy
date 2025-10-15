@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   try {
     const leagueId = parseInt((await params).id, 10);
-    const userId = parseInt((session.user as any).id, 10);
+    const userId = parseInt(session.user.id as string, 10);
 
     if (isNaN(leagueId)) {
       return NextResponse.json({ message: 'ID de liga inválido.' }, { status: 400 });

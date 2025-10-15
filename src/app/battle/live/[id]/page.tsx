@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import io, { Socket } from 'socket.io-client';
 import HealthBar from '@/components/HealthBar';
 import { Move } from '@/lib/battle';
+import { BattleState, PlayerBattleState, PokemonWithMoves } from '@/lib/battle-manager';
 
 export default function LiveBattlePage() {
   const params = useParams();
@@ -13,7 +14,7 @@ export default function LiveBattlePage() {
   const myTeamId = searchParams.get('myTeamId');
 
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [battleState, setBattleState] = useState<any>(null);
+  const [battleState, setBattleState] = useState<BattleState | null>(null);
   const [menuState, setMenuState] = useState<'main' | 'moves' | 'switch'>('main');
   const [battleEnded, setBattleEnded] = useState<{ winnerId: number | null; message: string } | null>(null);
 
@@ -27,7 +28,7 @@ export default function LiveBattlePage() {
       newSocket.emit('joinBattle', battleId, myTeamId);
     });
 
-    newSocket.on('updateState', (state) => {
+    newSocket.on('updateState', (state: BattleState) => {
       console.log('Received updateState event:', state);
       setBattleState(state);
       // Do not reset menu state here, as it could interfere with forced switches
@@ -53,7 +54,7 @@ export default function LiveBattlePage() {
     if (battleState && myTeamId && !battleEnded) {
       const myPlayer = battleState.players[parseInt(myTeamId, 10)];
       if (myPlayer && myPlayer.activePokemon.currentHp === 0 && menuState !== 'switch') {
-        const hasSwitchablePokemon = myPlayer.team.some((p: any) => p.currentHp > 0);
+        const hasSwitchablePokemon = myPlayer.team.some((p: PokemonWithMoves) => p.currentHp > 0);
         if (hasSwitchablePokemon) {
           setMenuState('switch');
         } else {
@@ -89,7 +90,7 @@ export default function LiveBattlePage() {
   }
 
   const myPlayer = battleState.players[parseInt(myTeamId, 10)];
-  const opponentPlayer = Object.values(battleState.players).find((p: any) => p.teamId !== parseInt(myTeamId, 10));
+  const opponentPlayer = Object.values(battleState.players).find((p: PlayerBattleState) => p.teamId !== parseInt(myTeamId, 10));
 
   if (!myPlayer || !opponentPlayer) {
     return <div className="container text-center mt-5"><h1>Waiting for opponent...</h1></div>;
@@ -169,7 +170,7 @@ export default function LiveBattlePage() {
                   )}
                   {menuState === 'switch' && (
                     <>
-                      {myPlayer.team.map((pokemon: any) => (
+                      {myPlayer.team.map((pokemon: PokemonWithMoves) => (
                         <button 
                           key={pokemon.id} 
                           onClick={() => handleSwitchPokemon(pokemon.id)}

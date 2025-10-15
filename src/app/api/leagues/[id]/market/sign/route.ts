@@ -25,8 +25,8 @@ export async function POST(
         where: {
             id: teamId,
             leagueId: leagueId,
-            // @ts-ignore
-            userId: parseInt(session.user.id),
+            // @ts-expect-error
+            userId: parseInt(session.user.id as string),
         }
     });
 

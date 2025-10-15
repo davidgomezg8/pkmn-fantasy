@@ -16,8 +16,8 @@ export async function GET(
 
   const { id } = params;
   const leagueId = parseInt(id);
-  // @ts-ignore
-  const userId = parseInt(session.user.id);
+  // @ts-expect-error
+  const userId = parseInt(session.user.id as string);
   
   console.log(`[GET /api/leagues/[id]/team] Searching for team with leagueId: ${leagueId}, userId: ${userId}`);
 

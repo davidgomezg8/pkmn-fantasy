@@ -11,12 +11,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const userId = parseInt((session.user as any).id, 10);
+    const userId = parseInt(session.user.id as string, 10);
     const { searchParams } = new URL(request.url);
     const leagueIdParam = searchParams.get('leagueId');
     const leagueId = leagueIdParam ? parseInt(leagueIdParam, 10) : undefined;
 
-    const whereClause: any = { userId: userId };
+    const whereClause: { userId: number; leagueId?: number } = { userId: userId };
     if (leagueId) {
       whereClause.leagueId = leagueId;
     }

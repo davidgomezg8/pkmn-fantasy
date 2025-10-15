@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     }
 
     const { leagueId, opponentTeamId } = await request.json();
-    const userId = parseInt((session.user as any).id, 10);
+    const userId = parseInt(session.user.id as string, 10);
     const userEmail = session.user.email as string;
 
     if (!leagueId || !opponentTeamId) {
