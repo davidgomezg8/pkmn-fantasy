@@ -38,9 +38,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No se encontró el equipo del oponente' }, { status: 404 });
     }
 
-    // Map pokemons to include currentHp
-    const teamAPokemons = currentUserTeam.pokemons.map(p => ({ ...p, currentHp: p.hp }));
-    const teamBPokemons = opponentTeam.pokemons.map(p => ({ ...p, currentHp: p.hp }));
+    // Map pokemons to include currentHp and parse moves
+    const teamAPokemons = currentUserTeam.pokemons.map(p => ({
+      ...p,
+      currentHp: p.hp,
+      moves: p.moves as any as Move[], // Cast JsonValue to Move[]
+    }));
+    const teamBPokemons = opponentTeam.pokemons.map(p => ({
+      ...p,
+      currentHp: p.hp,
+      moves: p.moves as any as Move[], // Cast JsonValue to Move[]
+    }));
 
     // Simulate the battle
     const battleResult = simulateBattle(teamAPokemons, teamBPokemons);
