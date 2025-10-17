@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Start seeding ...');
 
-  // Limpiar datos existentes (en orden inverso de dependencia)
+  // Clear existing data (in reverse order of dependency)
   await prisma.battle.deleteMany();
   await prisma.trade.deleteMany();
   await prisma.pokemon.deleteMany();
@@ -14,7 +14,7 @@ async function main() {
   await prisma.league.deleteMany();
   await prisma.user.deleteMany();
 
-  // Crear un usuario por defecto para ser el creador de las ligas
+  // Create a default user to be the creator of the leagues
   const hashedPassword = await bcrypt.hash('password123', 10); // Hash a default password
   const defaultUser = await prisma.user.create({
     data: {
@@ -24,119 +24,7 @@ async function main() {
   });
   console.log(`Created default user: ${defaultUser.email} (ID: ${defaultUser.id})`);
 
-  // Crear Ligas de ejemplo con el usuario por defecto como creador
-  const kantoLeague = await prisma.league.create({
-    data: {
-      name: 'Liga Añil de Kanto',
-      creatorId: defaultUser.id,
-      status: 'OPEN', // Set initial status
-      maxPlayers: 8,
-      joinCode: 'KANT01',
-      teams: {
-        create: { userId: defaultUser.id }, // Add creator to the league
-      },
-    },
-  });
-  console.log(`Kanto League ID: ${kantoLeague.id}`);
-
-  const johtoLeague = await prisma.league.create({
-    data: {
-      name: 'Torneo de Campeones de Johto',
-      creatorId: defaultUser.id,
-      status: 'OPEN',
-      maxPlayers: 8,
-      joinCode: 'J0HT02',
-      teams: {
-        create: { userId: defaultUser.id }, // Add creator to the league
-      },
-    },
-  });
-
-  const hoennLeague = await prisma.league.create({
-    data: {
-      name: 'Gran Festival de Hoenn',
-      creatorId: defaultUser.id,
-      status: 'OPEN',
-      maxPlayers: 8,
-      joinCode: 'H0ENN3',
-      teams: {
-        create: { userId: defaultUser.id }, // Add creator to the league
-      },
-    },
-  });
-
-  // Fetch and seed Pokémon data
-  console.log('Fetching Pokémon data from PokeAPI...');
-  const POKEMON_COUNT = 151; // First 151 Pokémon (Gen 1)
-  const pokemonData = [];
-
-  for (let i = 1; i <= POKEMON_COUNT; i++) {
-    const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${i}`);
-    const data = await response.json();
-
-    const stats = data.stats.reduce((acc: any, stat: any) => {
-      acc[stat.stat.name.replace('-', '')] = stat.base_stat;
-      return acc;
-    }, {});
-
-    const movesData = await Promise.all(
-      data.moves.slice(0, 4).map(async (moveEntry: any) => {
-        const moveResponse = await fetch(moveEntry.move.url);
-        const moveDetails = await moveResponse.json();
-        let category: 'physical' | 'special' | 'status';
-        switch (moveDetails.damage_class.name) {
-          case 'physical':
-            category = 'physical';
-            break;
-          case 'special':
-            category = 'special';
-            break;
-          case 'status':
-            category = 'status';
-            break;
-          default:
-            category = 'status'; // Default to status if unknown
-        }
-        return {
-          name: moveDetails.name,
-          power: moveDetails.power || 0,
-          category: category,
-        };
-      })
-    );
-
-    pokemonData.push({
-      pokemonId: data.id,
-      name: data.name,
-      image: data.sprites.front_default,
-      hp: stats.hp || 0,
-      attack: stats.attack || 0,
-      defense: stats.defense || 0,
-      specialAttack: stats.specialattack || 0,
-      specialDefense: stats.specialdefense || 0,
-      speed: stats.speed || 0,
-      leagueId: null, // Assign to Kanto League
-      teamId: null,
-      order: 0,
-      moves: movesData, // Add moves data
-    });
-    console.log(`Seeding Pokemon: ${data.name}, leagueId: null`);
-  }
-
-  await prisma.pokemon.createMany({
-    data: pokemonData,
-  });
-  console.log(`Seeded ${POKEMON_COUNT} Pokémon.`);
-
-  const countMasterPokemons = await prisma.pokemon.count({
-    where: { leagueId: null },
-  });
-  console.log(`Number of master Pokemons in DB after seeding: ${countMasterPokemons}`);
-
   console.log('Seeding finished.');
-  console.log(`Created league: ${kantoLeague.name} (ID: ${kantoLeague.id})`);
-  console.log(`Created league: ${johtoLeague.name} (ID: ${johtoLeague.id})`);
-  console.log(`Created league: ${hoennLeague.name} (ID: ${hoennLeague.id})`);
 }
 
 main()
