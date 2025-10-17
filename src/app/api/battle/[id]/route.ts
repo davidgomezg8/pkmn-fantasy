@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     const battleId = parseInt(id, 10);
 
     if (isNaN(battleId)) {
