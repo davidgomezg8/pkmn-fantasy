@@ -6,7 +6,7 @@ interface Params {
   id: string;
 }
 
-export async function POST(request: Request, context: { params: Params }) {
+export async function POST(request, { params }) {
   try {
     const { id } = context.params;
     const battleId = parseInt(id, 10);
