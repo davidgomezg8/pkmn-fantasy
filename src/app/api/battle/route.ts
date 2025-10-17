@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { simulateBattle } from '@/lib/battle';
+import { simulateBattle, Move } from '@/lib/battle';
 
 export async function POST(request: Request) {
   try {
