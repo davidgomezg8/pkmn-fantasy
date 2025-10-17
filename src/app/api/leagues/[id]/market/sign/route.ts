@@ -3,10 +3,7 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next"
 import { authOptions } from '@/lib/auth';
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request, { params }) {
   const session = await getServerSession(authOptions); // Pass authOptions here
   if (!session || !session.user) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });

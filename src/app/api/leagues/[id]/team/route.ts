@@ -3,10 +3,7 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from '@/lib/auth';
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request, { params }) {
   console.log('[GET /api/leagues/[id]/team] Request received.');
   const session = await getServerSession(authOptions); // Pass authOptions here
   if (!session || !session.user) {

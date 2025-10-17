@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request, { params }) {
   const leagueId = parseInt(params.id);
   const { pokemonIds } = await request.json();
 

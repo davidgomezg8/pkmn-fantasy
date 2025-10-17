@@ -1,10 +1,7 @@
 // src/app/api/pokemon/sprite/[id]/route.ts
 import { NextResponse } from 'next/server';
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request, { params }) {
   const id = params.id;
   console.log(`[SPRITE PROXY] Received request for Pokemon ID: ${id}`);
 
