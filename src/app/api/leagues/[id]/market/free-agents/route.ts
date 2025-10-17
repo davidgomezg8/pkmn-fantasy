@@ -5,7 +5,7 @@ interface Params {
   id: string;
 }
 
-export async function GET(request: Request, context: { params: Params }) {
+export async function GET(request, { params }) {
   try {
     const { id } = context.params;
     const leagueId = parseInt(id, 10);
